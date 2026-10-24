@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Mosaic desktop concept</title>
+  <desc id="desc">A four-space overview with one active virtual desktop.</desc>
+  <rect width="512" height="512" rx="112" fill="#27344a" />
+  <rect x="96" y="101" width="320" height="310" rx="32" fill="#f4eee4" />
+  <path d="M96 133a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v36H96z" fill="#df7a5e" />
+  <circle cx="129" cy="133" r="8" fill="#27344a" opacity=".72" />
+  <circle cx="156" cy="133" r="8" fill="#27344a" opacity=".42" />
+  <rect x="124" y="196" width="112" height="80" rx="16" fill="#6d8edb" />
+  <path d="M157 292h46m-23-16v16" fill="none" stroke="#6d8edb" stroke-linecap="round" stroke-width="13" />
+  <rect x="276" y="196" width="112" height="80" rx="16" fill="#e5d5c8" />
+  <path d="M309 292h46m-23-16v16" fill="none" stroke="#c8a99a" stroke-linecap="round" stroke-width="13" />
+  <rect x="124" y="318" width="112" height="64" rx="16" fill="#e5d5c8" />
+  <rect x="276" y="318" width="112" height="64" rx="16" fill="#e5d5c8" />
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Stack desktop concept</title>
+  <desc id="desc">A selected desktop window lifted above a stack of workspaces.</desc>
+  <rect width="512" height="512" rx="112" fill="#1f3b32" />
+  <rect x="124" y="248" width="264" height="174" rx="26" fill="#29483d" stroke="#9bb8a5" stroke-width="12" />
+  <path d="M124 276a28 28 0 0 1 28-28h208a28 28 0 0 1 28 28v28H124z" fill="#9bb8a5" />
+  <rect x="105" y="190" width="264" height="174" rx="26" fill="#29483d" stroke="#e98568" stroke-width="14" />
+  <path d="M105 218a28 28 0 0 1 28-28h208a28 28 0 0 1 28 28v28H105z" fill="#e98568" />
+  <rect x="86" y="132" width="264" height="174" rx="26" fill="#eaf2e8" />
+  <path d="M86 160a28 28 0 0 1 28-28h208a28 28 0 0 1 28 28v28H86z" fill="#86c49a" />
+  <circle cx="117" cy="160" r="8" fill="#1f3b32" opacity=".72" />
+  <circle cx="143" cy="160" r="8" fill="#1f3b32" opacity=".42" />
+  <path d="M146 240h144" stroke="#1f3b32" stroke-linecap="round" stroke-width="18" />
+  <path d="M146 272h93" stroke="#b2c9b5" stroke-linecap="round" stroke-width="14" />
+</svg>

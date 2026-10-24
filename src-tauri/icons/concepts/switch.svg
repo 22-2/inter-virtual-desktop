@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Switch desktop concept</title>
+  <desc id="desc">Two desktop screens connected by opposing switch arrows.</desc>
+  <rect width="512" height="512" rx="112" fill="#1d2035" />
+  <rect x="67" y="151" width="151" height="120" rx="20" fill="#1d2035" stroke="#99a7ff" stroke-width="18" />
+  <path d="M112 294h61m-30-23v23" fill="none" stroke="#99a7ff" stroke-linecap="round" stroke-width="16" />
+  <rect x="294" y="241" width="151" height="120" rx="20" fill="#1d2035" stroke="#ff779f" stroke-width="18" />
+  <path d="M339 384h61m-30-23v23" fill="none" stroke="#ff779f" stroke-linecap="round" stroke-width="16" />
+  <path d="M239 169h87l-22-22m22 22-22 22" fill="none" stroke="#f5f3ff" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+  <path d="M273 332h-87l22-22m-22 22 22 22" fill="none" stroke="#f5f3ff" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+  <circle cx="256" cy="250" r="22" fill="#f5f3ff" />
+</svg>

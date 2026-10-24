@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Orbit desktop concept</title>
+  <desc id="desc">Two colorful desktop windows orbiting around a shared center.</desc>
+  <rect width="512" height="512" rx="112" fill="#291d38" />
+  <path d="M100 264a166 166 0 0 1 286-116" fill="none" stroke="#a78bfa" stroke-linecap="round" stroke-width="24" />
+  <path d="m363 111 34 32-43 16" fill="none" stroke="#a78bfa" stroke-linecap="round" stroke-linejoin="round" stroke-width="24" />
+  <path d="M412 248a166 166 0 0 1-286 116" fill="none" stroke="#f06aae" stroke-linecap="round" stroke-width="24" />
+  <path d="m149 401-34-32 43-16" fill="none" stroke="#f06aae" stroke-linecap="round" stroke-linejoin="round" stroke-width="24" />
+  <rect x="139" y="171" width="145" height="105" rx="18" fill="#291d38" stroke="#fff2fa" stroke-width="18" />
+  <path d="M180 298h63m-31-22v22" fill="none" stroke="#fff2fa" stroke-linecap="round" stroke-width="16" />
+  <rect x="228" y="236" width="145" height="105" rx="18" fill="#291d38" stroke="#a78bfa" stroke-width="18" />
+  <path d="M269 363h63m-31-22v22" fill="none" stroke="#a78bfa" stroke-linecap="round" stroke-width="16" />
+</svg>
