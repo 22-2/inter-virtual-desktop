@@ -1,5 +1,8 @@
 use serde::Serialize;
 
+#[cfg(target_os = "windows")]
+mod app_icons;
+
 #[derive(Clone, Serialize)]
 struct DesktopInfo {
     index: u32,
@@ -25,23 +28,15 @@ struct Snapshot {
 
 #[cfg(target_os = "windows")]
 mod platform {
+    use super::app_icons;
     use super::{DesktopInfo, Snapshot, WindowInfo};
-    use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::Path};
     use tauri::command;
-    use windows::{
-        Win32::{
-            Foundation::{BOOL, HWND, LPARAM},
-            System::Threading::{
-                OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION,
-                QueryFullProcessImageNameW,
-            },
-            UI::WindowsAndMessaging::{
-                EnumWindows, GW_OWNER, GWL_EXSTYLE, GetWindow, GetWindowLongW,
-                GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-                IsWindowVisible, PostMessageW, WM_CLOSE, WS_EX_TOOLWINDOW,
-            },
+    use windows::Win32::{
+        Foundation::{BOOL, HWND, LPARAM},
+        UI::WindowsAndMessaging::{
+            EnumWindows, GW_OWNER, GWL_EXSTYLE, GetWindow, GetWindowLongW, GetWindowTextLengthW,
+            GetWindowTextW, IsIconic, IsWindowVisible, PostMessageW, WM_CLOSE, WS_EX_TOOLWINDOW,
         },
-        core::PWSTR,
     };
 
     fn desktop_error(error: impl std::fmt::Debug) -> String {
@@ -49,34 +44,19 @@ mod platform {
     }
 
     fn process_name(hwnd: HWND) -> String {
-        let mut process_id = 0;
-        unsafe {
-            GetWindowThreadProcessId(hwnd, Some(&mut process_id));
-        }
-        let Ok(process) =
-            (unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) })
-        else {
-            return "アプリ".into();
-        };
-        let mut buffer = [0u16; 1024];
-        let mut length = buffer.len() as u32;
-        let result = unsafe {
-            QueryFullProcessImageNameW(
-                process,
-                PROCESS_NAME_FORMAT(0),
-                PWSTR(buffer.as_mut_ptr()),
-                &mut length,
-            )
-        };
-        if result.is_err() {
-            return "アプリ".into();
-        }
-        let path = OsString::from_wide(&buffer[..length as usize]);
-        Path::new(&path)
-            .file_stem()
+        app_icons::process_path(hwnd)
+            .as_deref()
+            .and_then(|path| path.file_stem())
             .and_then(|name| name.to_str())
             .unwrap_or("アプリ")
             .to_string()
+    }
+
+    #[command]
+    pub async fn get_window_icon(hwnd: isize) -> Result<Option<String>, String> {
+        tauri::async_runtime::spawn_blocking(move || app_icons::for_window(hwnd))
+            .await
+            .map_err(|error| format!("アイコン取得処理に失敗しました: {error}"))?
     }
 
     unsafe extern "system" fn collect_window(hwnd: HWND, context: LPARAM) -> BOOL {
@@ -229,6 +209,11 @@ mod platform {
     use tauri::command;
 
     #[command]
+    pub async fn get_window_icon(_: isize) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
+    #[command]
     pub fn get_snapshot() -> Result<Snapshot, String> {
         Err("Windowsでのみ利用できます。".into())
     }
@@ -273,6 +258,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
+            get_window_icon,
             create_desktop,
             switch_desktop,
             remove_desktop,

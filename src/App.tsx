@@ -32,6 +32,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "@react-spectrum/s2/page.css";
 import { retainVisibleRows, selectRow, selectRowForContextMenu } from "./row-selection";
+import { AppIcon } from "./app-icon";
 import "./App.css";
 
 type Desktop = { index: number; name: string; current: boolean };
@@ -785,12 +786,7 @@ export function App() {
                               aria-label={item.app_name}
                               title={item.app_name}
                             >
-                              <span
-                                className={`app-icon ${item.app_name.toLowerCase().includes("explorer") ? "explorer" : ""}`}
-                                aria-hidden="true"
-                              >
-                                {item.app_name.slice(0, 1).toUpperCase()}
-                              </span>
+                              <AppIcon hwnd={item.hwnd} appName={item.app_name} />
                             </td>
                             <td>
                               <button
