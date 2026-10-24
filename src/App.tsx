@@ -278,6 +278,10 @@ export function App() {
                 : { kind: "desktop", index: contextMenu.index };
           } else if (event.button !== 2) {
             pendingContextTarget.current = null;
+            const target = event.target instanceof Element ? event.target : null;
+            if (event.button === 0 && contextMenu && !target?.closest(".quick-context-menu")) {
+              setContextMenu(null);
+            }
           }
         }}
         onContextMenuCapture={(event) => {
