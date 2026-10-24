@@ -389,6 +389,11 @@ export function App() {
       return;
     }
 
+    if (key === "focus") {
+      void run("focus_window", { hwnd: menu.hwnd });
+      return;
+    }
+
     if (typeof key === "string" && key.startsWith("move:")) {
       const desktopIndex = Number(key.slice("move:".length));
       void runWindowBatch(contextWindows, (window) => ({
@@ -768,6 +773,12 @@ export function App() {
                             className={`window-row ${isSelected ? "is-selected" : ""}`}
                             data-window-hwnd={item.hwnd}
                             draggable
+                            onDoubleClick={(event) => {
+                              if ((event.target as HTMLElement).closest(".window-actions-cell"))
+                                return;
+                              setContextMenu(null);
+                              void run("focus_window", { hwnd: item.hwnd });
+                            }}
                             onClick={(event) => {
                               if ((event.target as HTMLElement).closest("button")) return;
                               setWindowSelection((selection) =>
@@ -899,6 +910,9 @@ export function App() {
               aria-label="ウィンドウの操作"
               onAction={handleContextMenuAction}
             >
+              <MenuItem id="focus" isDisabled={!contextWindow}>
+                フォーカスして前面に表示
+              </MenuItem>
               <SubmenuTrigger>
                 <MenuItem id="move" isDisabled={!contextMoveDestinations.length}>
                   {contextWindows.length > 1

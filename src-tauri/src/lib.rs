@@ -3,6 +3,9 @@ use serde::Serialize;
 #[cfg(target_os = "windows")]
 mod app_icons;
 
+#[cfg(target_os = "windows")]
+mod window_focus;
+
 #[derive(Clone, Serialize)]
 struct DesktopInfo {
     index: u32,
@@ -198,6 +201,11 @@ mod platform {
     }
 
     #[command]
+    pub fn focus_window(hwnd: isize) -> Result<(), String> {
+        super::window_focus::activate(hwnd)
+    }
+
+    #[command]
     pub fn close_window(hwnd: isize) -> Result<(), String> {
         unsafe { PostMessageW(HWND(hwnd as *mut _), WM_CLOSE, None, None) }.map_err(desktop_error)
     }
@@ -246,6 +254,10 @@ mod platform {
         Err("Windowsでのみ利用できます。".into())
     }
     #[command]
+    pub fn focus_window(_: isize) -> Result<(), String> {
+        Err("Windowsでのみ利用できます。".into())
+    }
+    #[command]
     pub fn close_window(_: isize) -> Result<(), String> {
         Err("Windowsでのみ利用できます。".into())
     }
@@ -266,6 +278,7 @@ pub fn run() {
             move_window,
             pin_window,
             unpin_window,
+            focus_window,
             close_window
         ])
         .run(tauri::generate_context!())
