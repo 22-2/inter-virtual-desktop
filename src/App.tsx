@@ -937,13 +937,15 @@ export function App() {
                       id={`move:${desktop.index}`}
                       textValue={`${desktopName(desktop.index)}へ移動`}
                     >
-                      <span
+                      {/* S2のメニュー項目はTextスロットへ文字スタイルを渡すため、標準spanではラベルが見えなくなる。 */}
+                      <Text
                         slot="label"
-                        className="context-menu-label"
-                        title={desktopName(desktop.index)}
+                        UNSAFE_className="context-menu-label"
                       >
-                        {desktopName(desktop.index)}へ移動
-                      </span>
+                        <span title={desktopName(desktop.index)}>
+                          {desktopName(desktop.index)}へ移動
+                        </span>
+                      </Text>
                     </MenuItem>
                   ))}
                 </Menu>

@@ -91,7 +91,10 @@ test.describe("画面端のサブメニュー", () => {
           )
           .toBe(true);
         await expect(page.locator('[data-trigger="SubmenuTrigger"]')).toHaveCSS("width", "240px");
-        const label = await page.locator(".context-menu-label").first().boundingBox();
+        const labelLocator = page.locator(".context-menu-label").first();
+        await expect(labelLocator).toHaveText("🥺調べものの非常に長いデスクトップ名 1へ移動");
+        const label = await labelLocator.boundingBox();
+        expect(label!.width).toBeGreaterThan(100);
         expect(label!.height).toBeLessThan(30);
       });
     }
