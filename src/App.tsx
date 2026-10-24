@@ -28,7 +28,8 @@ import Sort from "@react-spectrum/s2/icons/Sort";
 import SortDown from "@react-spectrum/s2/icons/SortDown";
 import SortUp from "@react-spectrum/s2/icons/SortUp";
 import { style } from "@react-spectrum/s2/style" with { type: "macro" };
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import "@react-spectrum/s2/page.css";
 import { retainVisibleRows, selectRow, selectRowForContextMenu } from "./row-selection";
 import "./App.css";
@@ -148,20 +149,47 @@ export function App() {
       setContextMenu(null);
       if (!target?.closest("[data-window-hwnd], [data-window-sort]")) clearSelection();
     };
-    const handleBlur = () => {
-      setContextMenu(null);
-      pendingContextTarget.current = null;
-      clearSelection();
-    };
-
-    // ポータルやライブラリが伝播を止める前に捕捉し、別アプリへのクリックも閉じる。
+    // ポータルやライブラリが伝播を止める前に捕捉する。
     window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("blur", handleBlur);
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("blur", handleBlur);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    const dismiss = () => {
+      setContextMenu(null);
+      pendingContextTarget.current = null;
+      setWindowSelection((selection) =>
+        selection.ids.size || selection.anchorId !== null
+          ? { ids: new Set(), anchorId: null }
+          : selection,
+      );
+    };
+    window.addEventListener("blur", dismiss);
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    if (isTauri()) {
+      // WebView内のフォーカス移動に加え、Windowsのウィンドウ非アクティブ化も拾う。
+      void getCurrentWindow()
+        .onFocusChanged(({ payload: focused }) => {
+          if (!focused) dismiss();
+        })
+        .then((stop) => {
+          if (disposed) stop();
+          else unlisten = stop;
+        })
+        .catch((reason) => {
+          if (!disposed) toastQueue.negative(`ウィンドウのフォーカスを監視できません: ${reason}`);
+        });
+    }
+    return () => {
+      disposed = true;
+      window.removeEventListener("blur", dismiss);
+      unlisten?.();
+    };
+  }, []);
 
   const refresh = async () => {
     try {
