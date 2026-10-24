@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionButton,
   Button,
+  ButtonGroup,
   Checkbox,
+  Content,
   Dialog,
   DialogTrigger,
   Heading,
@@ -598,32 +600,36 @@ export function App() {
                         ? "デスクトップを削除"
                         : "デスクトップを追加"}
                   </Heading>
-                  <Text>
-                    {dialog?.kind === "delete"
-                      ? `「${desktopName(dialog.index)}」を削除します。ウィンドウは別のデスクトップへ移動します。`
-                      : dialog?.kind === "rename"
-                        ? "新しい名前を入力してください。"
-                        : "新しい仮想デスクトップを作成します。"}
-                  </Text>
-                  {dialog?.kind === "rename" && (
-                    <TextField
-                      label="デスクトップ名"
-                      value={dialogValue}
-                      onChange={setDialogValue}
-                      autoFocus
-                    />
-                  )}
-                  <Button
-                    slot="close"
-                    variant={dialog?.kind === "delete" ? "negative" : "accent"}
-                    onPress={() => void confirmDialog()}
-                  >
-                    {dialog?.kind === "rename"
-                      ? "保存"
-                      : dialog?.kind === "delete"
-                        ? "削除"
-                        : "作成"}
-                  </Button>
+                  <Content>
+                    <Text>
+                      {dialog?.kind === "delete"
+                        ? `「${desktopName(dialog.index)}」を削除します。ウィンドウは別のデスクトップへ移動します。`
+                        : dialog?.kind === "rename"
+                          ? "新しい名前を入力してください。"
+                          : "新しい仮想デスクトップを作成します。"}
+                    </Text>
+                    {dialog?.kind === "rename" && (
+                      <TextField
+                        label="デスクトップ名"
+                        value={dialogValue}
+                        onChange={setDialogValue}
+                        autoFocus
+                      />
+                    )}
+                  </Content>
+                  <ButtonGroup>
+                    <Button
+                      slot="close"
+                      variant={dialog?.kind === "delete" ? "negative" : "accent"}
+                      onPress={() => void confirmDialog()}
+                    >
+                      {dialog?.kind === "rename"
+                        ? "保存"
+                        : dialog?.kind === "delete"
+                          ? "削除"
+                          : "作成"}
+                    </Button>
+                  </ButtonGroup>
                 </Dialog>
               </DialogTrigger>
             </div>
