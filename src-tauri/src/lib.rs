@@ -31,14 +31,17 @@ struct Snapshot {
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use super::app_icons;
     use super::{DesktopInfo, Snapshot, WindowInfo};
+    use super::app_icons;
     use tauri::command;
-    use windows::Win32::{
-        Foundation::{BOOL, HWND, LPARAM},
-        UI::WindowsAndMessaging::{
-            EnumWindows, GW_OWNER, GWL_EXSTYLE, GetWindow, GetWindowLongW, GetWindowTextLengthW,
-            GetWindowTextW, IsIconic, IsWindowVisible, PostMessageW, WM_CLOSE, WS_EX_TOOLWINDOW,
+    use windows::{
+        Win32::{
+            Foundation::{BOOL, HWND, LPARAM},
+            UI::WindowsAndMessaging::{
+                EnumWindows, GW_OWNER, GWL_EXSTYLE, GetWindow, GetWindowLongW,
+                GetWindowTextLengthW, GetWindowTextW, IsIconic,
+                IsWindowVisible, PostMessageW, WM_CLOSE, WS_EX_TOOLWINDOW,
+            },
         },
     };
 
