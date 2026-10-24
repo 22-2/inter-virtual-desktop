@@ -483,11 +483,6 @@ input {
   outline: 1px solid var(--ui-accent);
   outline-offset: -1px;
 }
-.window-list:focus-visible {
-  outline: 1px solid var(--ui-accent);
-  outline-offset: -1px;
-}
-
 .empty-panel,
 .error-panel {
   display: grid;
