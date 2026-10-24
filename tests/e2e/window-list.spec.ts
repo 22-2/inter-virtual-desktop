@@ -47,6 +47,24 @@ test("定期更新時の列挙順が変わっても表示順を維持する", as
   await expect.poll(() => app.ids()).toEqual([103, 102, 105, 101, 104]);
 });
 
+test("同じソートキーのウィンドウも更新後にHWND順を維持する", async ({ app }) => {
+  const windows = [300, 100, 200].map((hwnd) => ({
+    ...defaultSnapshot.windows[0],
+    hwnd,
+    title: "同じタイトル",
+    app_name: "同じアプリ",
+  }));
+  const snapshot = { ...defaultSnapshot, windows };
+
+  await app.setSnapshot(snapshot);
+  await app.refresh();
+  await expect.poll(() => app.ids()).toEqual([100, 200, 300]);
+
+  await app.setSnapshot({ ...snapshot, windows: [...windows].reverse() });
+  await app.refresh();
+  await expect.poll(() => app.ids()).toEqual([100, 200, 300]);
+});
+
 test("表示順を使ったShift選択とCtrl選択・全選択・解除ができる", async ({ app, page }) => {
   await app.row(103).locator(".window-title").click();
   await app
@@ -88,6 +106,30 @@ test("選択した複数ウィンドウをサブメニューから一括移動�
   await expect(app.row(101)).toHaveCount(0);
   await expect(app.row(103)).toHaveCount(0);
   await expect.poll(() => app.selectedIds()).toEqual([]);
+});
+
+test("選択中のうち現在デスクトップ上でないウィンドウだけを移動する", async ({ app, page }) => {
+  await showAllDesktops(page);
+  await app.row(101).locator(".window-title").click();
+  await app.row(106).locator(".window-title").click({ modifiers: ["Control"] });
+  await app.row(106).locator(".window-title").click({ button: "right" });
+  await page
+    .getByRole("menuitem", { name: "選択した2件を現在のデスクトップへ移動", exact: true })
+    .click();
+
+  await expect.poll(() => app.calls()).toEqual([
+    { command: "move_window", args: { hwnd: 106, desktopIndex: 0 } },
+  ]);
+  await expect(app.row(106).locator(".window-desktop")).toHaveText("メイン");
+
+  await app.row(101).locator(".window-title").click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", {
+      name: "選択した2件を現在のデスクトップへ移動",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect.poll(() => app.calls()).toHaveLength(1);
 });
 
 test("ウィンドウをデスクトップにドラッグして移動できる", async ({ app, page }) => {

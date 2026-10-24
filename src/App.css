@@ -119,6 +119,14 @@ input {
   overflow: hidden;
 }
 
+.app-body[data-sidebar-collapsed="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-body[data-sidebar-collapsed="true"] .sidebar {
+  display: none;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;

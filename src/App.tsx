@@ -24,6 +24,8 @@ import {
 import Add from "@react-spectrum/s2/icons/Add";
 import Apps from "@react-spectrum/s2/icons/Apps";
 import BrightnessContrast from "@react-spectrum/s2/icons/BrightnessContrast";
+import ChevronLeft from "@react-spectrum/s2/icons/ChevronLeft";
+import ChevronRight from "@react-spectrum/s2/icons/ChevronRight";
 import DeviceDesktop from "@react-spectrum/s2/icons/DeviceDesktop";
 import More from "@react-spectrum/s2/icons/More";
 import Sort from "@react-spectrum/s2/icons/Sort";
@@ -93,6 +95,7 @@ const providerLayout = style({ width: "full", height: "full", minHeight: 0 });
 
 export function App() {
   const [dark, setDark] = useState(() => localStorage.getItem("theme") === "dark");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot>({ desktops: [], windows: [] });
   const [windowSelection, setWindowSelection] = useState<{
     ids: ReadonlySet<number>;
@@ -396,6 +399,18 @@ export function App() {
       return;
     }
 
+    if (key === "move-current") {
+      if (!current) return;
+      void runWindowBatch(
+        contextWindows.filter((window) => window.desktop_index !== current.index),
+        (window) => ({
+          command: "move_window",
+          args: { hwnd: window.hwnd, desktopIndex: current.index },
+        }),
+      );
+      return;
+    }
+
     if (typeof key === "string" && key.startsWith("move:")) {
       const desktopIndex = Number(key.slice("move:".length));
       void runWindowBatch(contextWindows, (window) => ({
@@ -474,6 +489,16 @@ export function App() {
         }}
       >
         <header className="topbar">
+          <ActionButton
+            size="S"
+            isQuiet
+            aria-label={sidebarCollapsed ? "サイドバーを展開" : "サイドバーを折りたたむ"}
+            aria-controls="virtual-desktop-sidebar"
+            aria-expanded={!sidebarCollapsed}
+            onPress={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          >
+            {sidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
+          </ActionButton>
           <div className="brand-mark" aria-hidden="true">
             <Apps />
           </div>
@@ -488,8 +513,8 @@ export function App() {
           </ActionButton>
         </header>
 
-        <div className="app-body">
-          <aside className="sidebar">
+        <div className="app-body" data-sidebar-collapsed={sidebarCollapsed}>
+          <aside className="sidebar" id="virtual-desktop-sidebar">
             <div className="sidebar-heading">
               <span>デスクトップ</span>
               <ActionButton
@@ -918,6 +943,17 @@ export function App() {
             >
               <MenuItem id="focus" isDisabled={!contextWindow}>
                 フォーカスして前面に表示
+              </MenuItem>
+              <MenuItem
+                id="move-current"
+                isDisabled={
+                  !current ||
+                  !contextWindows.some((window) => window.desktop_index !== current.index)
+                }
+              >
+                {contextWindows.length > 1
+                  ? `選択した${contextWindows.length}件を現在のデスクトップへ移動`
+                  : "このウィンドウを現在のデスクトップへ移動"}
               </MenuItem>
               <SubmenuTrigger>
                 <MenuItem id="move" isDisabled={!contextMoveDestinations.length}>

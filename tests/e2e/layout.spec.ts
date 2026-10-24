@@ -56,3 +56,15 @@ for (const viewport of [
     expect(geometry.maxRowHeight).toBe(36);
   });
 }
+
+test("サイドバーを折りたたんで再展開できる", async ({ app: _app, page }) => {
+  const collapse = page.getByRole("button", { name: "サイドバーを折りたたむ", exact: true });
+  await expect(collapse).toHaveAttribute("aria-expanded", "true");
+  await collapse.click();
+  await expect(page.locator(".sidebar")).toBeHidden();
+
+  const expand = page.getByRole("button", { name: "サイドバーを展開", exact: true });
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expand.click();
+  await expect(page.getByRole("navigation", { name: "仮想デスクトップ" })).toBeVisible();
+});
