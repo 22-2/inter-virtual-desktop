@@ -520,7 +520,20 @@ input {
 }
 
 .quick-context-menu {
+  width: min(320px, calc(100vw - 16px));
   transition-duration: 70ms !important;
+}
+
+[data-trigger="SubmenuTrigger"]:has(.context-menu-content) {
+  width: min(240px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+}
+.context-menu-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

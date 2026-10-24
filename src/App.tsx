@@ -872,7 +872,8 @@ export function App() {
           }
           placement={contextMenu?.placement ?? "bottom start"}
           offset={2}
-          containerPadding={4}
+          containerPadding={8}
+          shouldFlip
           hideArrow
           isNonModal
           UNSAFE_className="quick-context-menu"
@@ -911,8 +912,18 @@ export function App() {
                   onAction={handleContextMenuAction}
                 >
                   {contextMoveDestinations.map((desktop) => (
-                    <MenuItem key={desktop.index} id={`move:${desktop.index}`}>
-                      {desktopName(desktop.index)}へ移動
+                    <MenuItem
+                      key={desktop.index}
+                      id={`move:${desktop.index}`}
+                      textValue={`${desktopName(desktop.index)}へ移動`}
+                    >
+                      <span
+                        slot="label"
+                        className="context-menu-label"
+                        title={desktopName(desktop.index)}
+                      >
+                        {desktopName(desktop.index)}へ移動
+                      </span>
                     </MenuItem>
                   ))}
                 </Menu>
