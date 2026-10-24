@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionButton,
   Button,
@@ -8,9 +8,9 @@ import {
   Heading,
   Menu,
   MenuItem,
-  MenuTrigger,
   Picker,
   PickerItem,
+  Popover,
   Provider,
   SearchField,
   SubmenuTrigger,
@@ -39,6 +39,13 @@ type WindowInfo = {
   pinned: boolean;
 };
 type Snapshot = { desktops: Desktop[]; windows: WindowInfo[] };
+type ContextTarget = { kind: "window"; hwnd: number } | { kind: "desktop"; index: number };
+type ContextMenuState = ContextTarget & {
+  x: number;
+  y: number;
+  placement: "bottom start" | "bottom end";
+  requestId: number;
+};
 
 const toastQueue = ToastQueue;
 const fullWidth = style({ width: "full", minWidth: 0 });
@@ -65,7 +72,10 @@ export function App() {
     | { kind: "delete"; index: number }
   >(null);
   const [dialogValue, setDialogValue] = useState("");
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const contextMenuTriggerRef = useRef<HTMLElement | null>(null);
+  const contextMenuSequence = useRef(0);
+  const pendingContextTarget = useRef<ContextTarget | null>(null);
 
   const refresh = async () => {
     try {
@@ -179,9 +189,144 @@ export function App() {
   const desktopName = (index: number) =>
     snapshot.desktops.find((item) => item.index === index)?.name || `デスクトップ ${index + 1}`;
 
+  const showContextMenu = (
+    target: ContextTarget,
+    x: number,
+    y: number,
+    placement: ContextMenuState["placement"] = "bottom start",
+    trigger?: HTMLElement | null,
+  ) => {
+    contextMenuSequence.current += 1;
+    if (trigger) contextMenuTriggerRef.current = trigger;
+    setContextMenu({ ...target, x, y, placement, requestId: contextMenuSequence.current });
+    pendingContextTarget.current = null;
+  };
+
+  const contextWindow =
+    contextMenu?.kind === "window"
+      ? snapshot.windows.find((window) => window.hwnd === contextMenu.hwnd)
+      : undefined;
+  const contextWindows = contextWindow
+    ? windowSelection.ids.has(contextWindow.hwnd)
+      ? visibleWindows.filter((window) => windowSelection.ids.has(window.hwnd))
+      : [contextWindow]
+    : [];
+  const contextAllPinned =
+    contextWindows.length > 0 && contextWindows.every((window) => window.pinned);
+  const contextMoveDestinations = snapshot.desktops.filter((desktop) =>
+    contextWindows.some((window) => window.desktop_index !== desktop.index),
+  );
+  const contextSelectionLabel =
+    contextWindows.length > 1 ? `選択した${contextWindows.length}件を` : "このウィンドウを";
+  const contextPinLabel = contextAllPinned
+    ? contextWindows.length > 1
+      ? `選択した${contextWindows.length}件の固定を解除`
+      : "このウィンドウの固定を解除"
+    : `${contextSelectionLabel}すべてのデスクトップに表示`;
+
+  const handleContextMenuAction = (key: React.Key) => {
+    const menu = contextMenu;
+    setContextMenu(null);
+    pendingContextTarget.current = null;
+    if (!menu) return;
+
+    if (menu.kind === "desktop") {
+      if (key === "switch") void run("switch_desktop", { index: menu.index });
+      if (key === "rename") {
+        const desktop = snapshot.desktops.find((item) => item.index === menu.index);
+        if (desktop) openRename(desktop);
+      }
+      if (key === "delete") setDialog({ kind: "delete", index: menu.index });
+      return;
+    }
+
+    if (typeof key === "string" && key.startsWith("move:")) {
+      const desktopIndex = Number(key.slice("move:".length));
+      void runWindowBatch(contextWindows, (window) => ({
+        command: "move_window",
+        args: { hwnd: window.hwnd, desktopIndex },
+      }));
+    }
+    if (key === "pin") {
+      void runWindowBatch(
+        contextWindows.filter((window) => window.pinned !== !contextAllPinned),
+        (window) => ({
+          command: contextAllPinned ? "unpin_window" : "pin_window",
+          args: { hwnd: window.hwnd },
+        }),
+      );
+    }
+    if (key === "close") {
+      void runWindowBatch(contextWindows, (window) => ({
+        command: "close_window",
+        args: { hwnd: window.hwnd },
+      }));
+    }
+  };
+
   return (
     <Provider colorScheme={dark ? "dark" : "light"} locale="ja-JP" styles={providerLayout}>
-      <div className="app-shell" data-theme={dark ? "dark" : "light"}>
+      <div
+        className="app-shell"
+        data-theme={dark ? "dark" : "light"}
+        onPointerDownCapture={(event) => {
+          if (event.button === 2 && contextMenu) {
+            pendingContextTarget.current =
+              contextMenu.kind === "window"
+                ? { kind: "window", hwnd: contextMenu.hwnd }
+                : { kind: "desktop", index: contextMenu.index };
+          } else if (event.button !== 2) {
+            pendingContextTarget.current = null;
+          }
+        }}
+        onContextMenuCapture={(event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          const windowRow = target?.closest<HTMLElement>("[data-window-hwnd]");
+          if (windowRow) {
+            const hwnd = Number(windowRow.dataset.windowHwnd);
+            if (Number.isFinite(hwnd)) {
+              event.preventDefault();
+              setWindowSelection((selection) => selectRowForContextMenu(selection, hwnd));
+              showContextMenu(
+                { kind: "window", hwnd },
+                event.clientX,
+                event.clientY,
+                "bottom start",
+                windowRow.querySelector(".window-title"),
+              );
+              return;
+            }
+          }
+
+          const desktopEntry = target?.closest<HTMLElement>("[data-desktop-index]");
+          if (desktopEntry) {
+            const index = Number(desktopEntry.dataset.desktopIndex);
+            if (Number.isFinite(index)) {
+              event.preventDefault();
+              showContextMenu(
+                { kind: "desktop", index },
+                event.clientX,
+                event.clientY,
+                "bottom start",
+                desktopEntry.querySelector(".desktop-select"),
+              );
+              return;
+            }
+          }
+
+          const reopenTarget =
+            pendingContextTarget.current ??
+            (contextMenu
+              ? contextMenu.kind === "window"
+                ? { kind: "window", hwnd: contextMenu.hwnd }
+                : { kind: "desktop", index: contextMenu.index }
+              : null);
+          if (reopenTarget) {
+            event.preventDefault();
+            showContextMenu(reopenTarget, event.clientX, event.clientY);
+          }
+        }}
+      >
         <header className="topbar">
           <div className="brand-mark" aria-hidden="true">
             <Apps />
@@ -213,7 +358,6 @@ export function App() {
             <nav className="desktop-list" aria-label="仮想デスクトップ">
               {snapshot.desktops.map((desktop) => {
                 const name = desktopName(desktop.index);
-                const menuId = `desktop-${desktop.index}`;
                 const count = snapshot.windows.filter(
                   (item) => item.desktop_index === desktop.index,
                 ).length;
@@ -221,10 +365,7 @@ export function App() {
                   <div
                     key={desktop.index}
                     className={`desktop-entry ${activeDesktop === desktop.index ? "is-selected" : ""}`}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      setOpenMenu(menuId);
-                    }}
+                    data-desktop-index={desktop.index}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                       event.preventDefault();
@@ -248,30 +389,25 @@ export function App() {
                         {count}
                       </span>
                     </button>
-                    <MenuTrigger
-                      isOpen={openMenu === menuId}
-                      onOpenChange={(isOpen) => setOpenMenu(isOpen ? menuId : null)}
-                      align="end"
+                    <ActionButton
+                      size="XS"
+                      isQuiet
+                      aria-label={`${name} の操作`}
+                      onPress={(event) => {
+                        const trigger = event.target.closest<HTMLElement>("button");
+                        if (!trigger) return;
+                        const rect = trigger.getBoundingClientRect();
+                        showContextMenu(
+                          { kind: "desktop", index: desktop.index },
+                          rect.right,
+                          rect.bottom,
+                          "bottom end",
+                          trigger,
+                        );
+                      }}
                     >
-                      <ActionButton size="XS" isQuiet aria-label={`${name} の操作`}>
-                        <More />
-                      </ActionButton>
-                      <Menu
-                        size="S"
-                        onAction={(key) => {
-                          if (key === "switch")
-                            void run("switch_desktop", { index: desktop.index });
-                          if (key === "rename") openRename(desktop);
-                          if (key === "delete") setDialog({ kind: "delete", index: desktop.index });
-                        }}
-                      >
-                        <MenuItem id="switch">このデスクトップに切り替え</MenuItem>
-                        <MenuItem id="rename">名前を変更</MenuItem>
-                        <MenuItem id="delete" isDisabled={snapshot.desktops.length <= 1}>
-                          デスクトップを削除
-                        </MenuItem>
-                      </Menu>
-                    </MenuTrigger>
+                      <More />
+                    </ActionButton>
                   </div>
                 );
               })}
@@ -422,7 +558,7 @@ export function App() {
                   }
                   if (event.key === "Escape") {
                     setWindowSelection({ ids: new Set(), anchorId: null });
-                    setOpenMenu(null);
+                    setContextMenu(null);
                   }
                 }}
               >
@@ -447,28 +583,12 @@ export function App() {
                 )}
                 {!error &&
                   visibleWindows.map((item) => {
-                    const menuId = `window-${item.hwnd}`;
                     const isSelected = windowSelection.ids.has(item.hwnd);
-                    const selectedWindows = isSelected
-                      ? visibleWindows.filter((window) => windowSelection.ids.has(window.hwnd))
-                      : [item];
-                    const allPinned = selectedWindows.every((window) => window.pinned);
-                    const moveDestinations = snapshot.desktops.filter((desktop) =>
-                      selectedWindows.some((window) => window.desktop_index !== desktop.index),
-                    );
-                    const selectionLabel =
-                      selectedWindows.length > 1
-                        ? `選択した${selectedWindows.length}件を`
-                        : "このウィンドウを";
-                    const pinLabel = allPinned
-                      ? selectedWindows.length > 1
-                        ? `選択した${selectedWindows.length}件の固定を解除`
-                        : "このウィンドウの固定を解除"
-                      : `${selectionLabel}すべてのデスクトップに表示`;
                     return (
                       <div
                         key={item.hwnd}
                         className={`window-row ${isSelected ? "is-selected" : ""}`}
+                        data-window-hwnd={item.hwnd}
                         draggable
                         onClick={(event) => {
                           if ((event.target as HTMLElement).closest("button")) return;
@@ -482,13 +602,6 @@ export function App() {
                         onDragStart={(event) =>
                           event.dataTransfer.setData("text/window-hwnd", String(item.hwnd))
                         }
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          setWindowSelection((selection) =>
-                            selectRowForContextMenu(selection, item.hwnd),
-                          );
-                          setOpenMenu(menuId);
-                        }}
                       >
                         <span
                           className={`app-icon ${item.app_name.toLowerCase().includes("explorer") ? "explorer" : ""}`}
@@ -528,58 +641,25 @@ export function App() {
                           )}
                           {item.minimized && <span className="window-state">最小化</span>}
                         </span>
-                        <MenuTrigger
-                          isOpen={openMenu === menuId}
-                          onOpenChange={(isOpen) => setOpenMenu(isOpen ? menuId : null)}
-                          align="end"
+                        <ActionButton
+                          size="XS"
+                          isQuiet
+                          aria-label={`${item.title || item.app_name} の操作`}
+                          onPress={(event) => {
+                            const trigger = event.target.closest<HTMLElement>("button");
+                            if (!trigger) return;
+                            const rect = trigger.getBoundingClientRect();
+                            showContextMenu(
+                              { kind: "window", hwnd: item.hwnd },
+                              rect.right,
+                              rect.bottom,
+                              "bottom end",
+                              trigger,
+                            );
+                          }}
                         >
-                          <ActionButton size="XS" isQuiet aria-label={`${item.title} の操作`}>
-                            <More />
-                          </ActionButton>
-                          <Menu
-                            size="S"
-                            onAction={(key) => {
-                              if (typeof key === "string" && key.startsWith("move:")) {
-                                const desktopIndex = Number(key.slice("move:".length));
-                                void runWindowBatch(selectedWindows, (window) => ({
-                                  command: "move_window",
-                                  args: { hwnd: window.hwnd, desktopIndex },
-                                }));
-                              }
-                              if (key === "pin") {
-                                void runWindowBatch(
-                                  selectedWindows.filter((window) => window.pinned !== !allPinned),
-                                  (window) => ({
-                                    command: allPinned ? "unpin_window" : "pin_window",
-                                    args: { hwnd: window.hwnd },
-                                  }),
-                                );
-                              }
-                              if (key === "close")
-                                void runWindowBatch(selectedWindows, (window) => ({
-                                  command: "close_window",
-                                  args: { hwnd: window.hwnd },
-                                }));
-                            }}
-                          >
-                            <SubmenuTrigger>
-                              <MenuItem id="move" isDisabled={!moveDestinations.length}>
-                                {selectedWindows.length > 1
-                                  ? `選択した${selectedWindows.length}件の移動先`
-                                  : "移動先を選択"}
-                              </MenuItem>
-                              <Menu size="S">
-                                {moveDestinations.map((desktop) => (
-                                  <MenuItem key={desktop.index} id={`move:${desktop.index}`}>
-                                    {desktopName(desktop.index)}へ移動
-                                  </MenuItem>
-                                ))}
-                              </Menu>
-                            </SubmenuTrigger>
-                            <MenuItem id="pin">{pinLabel}</MenuItem>
-                            <MenuItem id="close">{selectionLabel}閉じる</MenuItem>
-                          </Menu>
-                        </MenuTrigger>
+                          <More />
+                        </ActionButton>
                       </div>
                     );
                   })}
@@ -587,6 +667,57 @@ export function App() {
             </section>
           </main>
         </div>
+        <Popover
+          key={contextMenu?.requestId ?? 0}
+          isOpen={contextMenu !== null}
+          triggerRef={contextMenuTriggerRef}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setContextMenu(null);
+          }}
+          getTargetRect={() =>
+            contextMenu ? new DOMRect(contextMenu.x, contextMenu.y, 0, 0) : new DOMRect()
+          }
+          placement={contextMenu?.placement ?? "bottom start"}
+          offset={2}
+          containerPadding={4}
+          hideArrow
+          isNonModal
+          UNSAFE_className="quick-context-menu"
+        >
+          {contextMenu?.kind === "desktop" && (
+            <Menu
+              size="S"
+              aria-label={`${desktopName(contextMenu.index)} の操作`}
+              onAction={handleContextMenuAction}
+            >
+              <MenuItem id="switch">このデスクトップに切り替え</MenuItem>
+              <MenuItem id="rename">名前を変更</MenuItem>
+              <MenuItem id="delete" isDisabled={snapshot.desktops.length <= 1}>
+                デスクトップを削除
+              </MenuItem>
+            </Menu>
+          )}
+          {contextMenu?.kind === "window" && (
+            <Menu size="S" aria-label="ウィンドウの操作" onAction={handleContextMenuAction}>
+              <SubmenuTrigger>
+                <MenuItem id="move" isDisabled={!contextMoveDestinations.length}>
+                  {contextWindows.length > 1
+                    ? `選択した${contextWindows.length}件の移動先`
+                    : "移動先を選択"}
+                </MenuItem>
+                <Menu size="S" aria-label="移動先" onAction={handleContextMenuAction}>
+                  {contextMoveDestinations.map((desktop) => (
+                    <MenuItem key={desktop.index} id={`move:${desktop.index}`}>
+                      {desktopName(desktop.index)}へ移動
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </SubmenuTrigger>
+              <MenuItem id="pin">{contextPinLabel}</MenuItem>
+              <MenuItem id="close">{`${contextSelectionLabel}閉じる`}</MenuItem>
+            </Menu>
+          )}
+        </Popover>
         <ToastContainer />
       </div>
     </Provider>
