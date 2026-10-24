@@ -13,6 +13,7 @@ import {
   PickerItem,
   Provider,
   SearchField,
+  SubmenuTrigger,
   Text,
   TextField,
   ToastContainer,
@@ -25,6 +26,7 @@ import More from "@react-spectrum/s2/icons/More";
 import { style } from "@react-spectrum/s2/style" with { type: "macro" };
 import { invoke } from "@tauri-apps/api/core";
 import "@react-spectrum/s2/page.css";
+import { retainVisibleRows, selectRow, selectRowForContextMenu } from "./row-selection";
 import "./App.css";
 
 type Desktop = { index: number; name: string; current: boolean };
@@ -45,6 +47,10 @@ const providerLayout = style({ width: "full", height: "full", minHeight: 0 });
 export function App() {
   const [dark, setDark] = useState(() => localStorage.getItem("theme") === "dark");
   const [snapshot, setSnapshot] = useState<Snapshot>({ desktops: [], windows: [] });
+  const [windowSelection, setWindowSelection] = useState<{
+    ids: ReadonlySet<number>;
+    anchorId: number | null;
+  }>({ ids: new Set(), anchorId: null });
   const [query, setQuery] = useState("");
   const [appFilter, setAppFilter] = useState("all");
   const [desktopFilter, setDesktopFilter] = useState("selected");
@@ -116,6 +122,12 @@ export function App() {
       activeDesktop,
     ],
   );
+  const visibleWindowIds = visibleWindows.map((window) => window.hwnd);
+  const selectedWindowCount = windowSelection.ids.size;
+
+  useEffect(() => {
+    setWindowSelection((selection) => retainVisibleRows(selection, visibleWindowIds));
+  }, [visibleWindowIds]);
 
   const run = async (command: string, args: Record<string, unknown> = {}) => {
     try {
@@ -123,6 +135,27 @@ export function App() {
       await refresh();
     } catch (reason) {
       toastQueue.negative(String(reason));
+    }
+  };
+
+  const runWindowBatch = async (
+    windows: WindowInfo[],
+    action: (window: WindowInfo) => { command: string; args: Record<string, unknown> },
+  ) => {
+    const failures: string[] = [];
+    for (const window of windows) {
+      const { command, args } = action(window);
+      try {
+        await invoke(command, args);
+      } catch (reason) {
+        failures.push(String(reason));
+      }
+    }
+    await refresh();
+    if (failures.length) {
+      toastQueue.negative(
+        `${failures.length} 件のウィンドウを操作できませんでした: ${failures[0]}`,
+      );
     }
   };
 
@@ -368,9 +401,31 @@ export function App() {
             <section className="window-section" aria-labelledby="window-list-heading">
               <div className="section-title">
                 <h2 id="window-list-heading">ウィンドウ</h2>
-                <span className="window-count">{visibleWindows.length} 件</span>
+                <span className="window-count" aria-live="polite">
+                  {selectedWindowCount
+                    ? `${selectedWindowCount} / ${visibleWindows.length} 件を選択中`
+                    : `${visibleWindows.length} 件`}
+                </span>
               </div>
-              <div className="window-list" role="region" aria-label="ウィンドウ一覧" tabIndex={0}>
+              <div
+                className="window-list"
+                role="region"
+                aria-label="ウィンドウ一覧。クリックで選択、CtrlまたはShiftを押しながらクリックで複数選択"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+                    event.preventDefault();
+                    setWindowSelection({
+                      ids: new Set(visibleWindowIds),
+                      anchorId: visibleWindowIds[0] ?? null,
+                    });
+                  }
+                  if (event.key === "Escape") {
+                    setWindowSelection({ ids: new Set(), anchorId: null });
+                    setOpenMenu(null);
+                  }
+                }}
+              >
                 {error && (
                   <div className="error-panel">
                     <strong>仮想デスクトップAPIに接続できません</strong>
@@ -393,16 +448,45 @@ export function App() {
                 {!error &&
                   visibleWindows.map((item) => {
                     const menuId = `window-${item.hwnd}`;
+                    const isSelected = windowSelection.ids.has(item.hwnd);
+                    const selectedWindows = isSelected
+                      ? visibleWindows.filter((window) => windowSelection.ids.has(window.hwnd))
+                      : [item];
+                    const allPinned = selectedWindows.every((window) => window.pinned);
+                    const moveDestinations = snapshot.desktops.filter((desktop) =>
+                      selectedWindows.some((window) => window.desktop_index !== desktop.index),
+                    );
+                    const selectionLabel =
+                      selectedWindows.length > 1
+                        ? `選択した${selectedWindows.length}件を`
+                        : "このウィンドウを";
+                    const pinLabel = allPinned
+                      ? selectedWindows.length > 1
+                        ? `選択した${selectedWindows.length}件の固定を解除`
+                        : "このウィンドウの固定を解除"
+                      : `${selectionLabel}すべてのデスクトップに表示`;
                     return (
                       <div
                         key={item.hwnd}
-                        className="window-row"
+                        className={`window-row ${isSelected ? "is-selected" : ""}`}
                         draggable
+                        onClick={(event) => {
+                          if ((event.target as HTMLElement).closest("button")) return;
+                          setWindowSelection((selection) =>
+                            selectRow(selection, item.hwnd, visibleWindowIds, {
+                              toggle: event.ctrlKey || event.metaKey,
+                              range: event.shiftKey,
+                            }),
+                          );
+                        }}
                         onDragStart={(event) =>
                           event.dataTransfer.setData("text/window-hwnd", String(item.hwnd))
                         }
                         onContextMenu={(event) => {
                           event.preventDefault();
+                          setWindowSelection((selection) =>
+                            selectRowForContextMenu(selection, item.hwnd),
+                          );
                           setOpenMenu(menuId);
                         }}
                       >
@@ -412,12 +496,22 @@ export function App() {
                         >
                           {item.app_name.slice(0, 1).toUpperCase()}
                         </span>
-                        <span
+                        <button
+                          type="button"
                           className="window-title"
+                          aria-pressed={isSelected}
                           title={`${item.title || item.app_name}\n${item.app_name}`}
+                          onClick={(event) =>
+                            setWindowSelection((selection) =>
+                              selectRow(selection, item.hwnd, visibleWindowIds, {
+                                toggle: event.ctrlKey || event.metaKey,
+                                range: event.shiftKey,
+                              }),
+                            )
+                          }
                         >
                           {item.title || item.app_name}
-                        </span>
+                        </button>
                         <span className="window-status">
                           {desktopFilter === "all" && (
                             <span
@@ -445,32 +539,45 @@ export function App() {
                           <Menu
                             size="S"
                             onAction={(key) => {
-                              if (key === "move") {
-                                const destination = snapshot.desktops.find(
-                                  (desktop) => desktop.index !== item.desktop_index,
-                                );
-                                if (destination)
-                                  void run("move_window", {
-                                    hwnd: item.hwnd,
-                                    desktopIndex: destination.index,
-                                  });
+                              if (typeof key === "string" && key.startsWith("move:")) {
+                                const desktopIndex = Number(key.slice("move:".length));
+                                void runWindowBatch(selectedWindows, (window) => ({
+                                  command: "move_window",
+                                  args: { hwnd: window.hwnd, desktopIndex },
+                                }));
                               }
-                              if (key === "pin")
-                                void run(item.pinned ? "unpin_window" : "pin_window", {
-                                  hwnd: item.hwnd,
-                                });
-                              if (key === "close") void run("close_window", { hwnd: item.hwnd });
+                              if (key === "pin") {
+                                void runWindowBatch(
+                                  selectedWindows.filter((window) => window.pinned !== !allPinned),
+                                  (window) => ({
+                                    command: allPinned ? "unpin_window" : "pin_window",
+                                    args: { hwnd: window.hwnd },
+                                  }),
+                                );
+                              }
+                              if (key === "close")
+                                void runWindowBatch(selectedWindows, (window) => ({
+                                  command: "close_window",
+                                  args: { hwnd: window.hwnd },
+                                }));
                             }}
                           >
-                            <MenuItem id="move" isDisabled={snapshot.desktops.length <= 1}>
-                              別のデスクトップへ移動
-                            </MenuItem>
-                            <MenuItem id="pin">
-                              {item.pinned
-                                ? "このウィンドウの固定を解除"
-                                : "このウィンドウをすべてのデスクトップに表示"}
-                            </MenuItem>
-                            <MenuItem id="close">ウィンドウを閉じる</MenuItem>
+                            <SubmenuTrigger>
+                              <MenuItem id="move" isDisabled={!moveDestinations.length}>
+                                {selectedWindows.length > 1
+                                  ? `選択した${selectedWindows.length}件の移動先`
+                                  : "移動先を選択"}
+                              </MenuItem>
+                              <Menu size="S">
+                                {moveDestinations.map((desktop) => (
+                                  <MenuItem key={desktop.index} id={`move:${desktop.index}`}>
+                                    {desktopName(desktop.index)}へ移動
+                                  </MenuItem>
+                                ))}
+                              </Menu>
+                            </SubmenuTrigger>
+                            <MenuItem id="pin">{pinLabel}</MenuItem>
+                            <MenuItem id="close">{selectionLabel}閉じる</MenuItem>
                           </Menu>
                         </MenuTrigger>
                       </div>
