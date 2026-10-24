@@ -35,3 +35,52 @@ Rust command layer
 pnpm install
 pnpm tauri dev
 ```
+
+## ローカルE2E
+
+Windows 11上で、Microsoft Edge・Playwright・[offstage-windows](https://github.com/LippInc/offstage-windows)を使います。
+通常のE2Eは、ブラウザーを隠しデスクトップに表示して実行するため、作業中の画面やキーボードフォーカスを奪いません。
+CI用のジョブには組み込まず、`CI`が設定されている場合は実行スクリプトがスキップします。
+
+```powershell
+pnpm install
+pnpm test:e2e
+
+# 対象を絞って実行
+pnpm test:e2e tests/e2e/menus.spec.ts
+pnpm test:e2e --grep 外側クリック
+
+# テストコードの型チェック
+pnpm typecheck:e2e
+
+# 失敗時のスクリーンショット・トレースをレポートで確認
+pnpm test:e2e:report
+```
+
+初回はoffstage-windowsがWindows付属のC#コンパイラーでヘルパーを作成します。
+ヘルパーが使えない場合や`OFFSTAGE=0`の場合は停止し、通常画面での実行には切り替えません。
+Playwrightを直接実行する場合も、隠しデスクトップ外からの通常実行とCI実行を設定側で拒否します。
+対話デバッグをしたい場合だけ、可視ウィンドウの`pnpm test:e2e:ui`を使ってください。
+
+テスト開始時にフロントエンドをビルドし、専用のプレビューサーバー（`127.0.0.1:1422`）を起動します。
+Tauri開発用の1420番ポートは使用しません。ブラウザーを1ワーカーで実行し、フォーカスの競合を防ぎます。
+テスト終了時はoffstage-windowsが残った子プロセスも終了します。
+失敗時の画像・トレースは`test-results/playwright/`、HTMLレポートは`playwright-report/`、
+隠しデスクトップの実行記録は`test-results/offstage/`に保存します。
+
+### 確認する範囲
+
+- 一覧、検索、絞り込み、並べ替え、定期更新、複数選択
+- 外側クリックでの解除、右クリックの再表示、四隅でのサブメニュー配置
+- ドラッグ・一括移動、デスクトップ名変更、ダークモードの保存
+- アイコンの表示・頭文字への切り替え、ダブルクリックとメニューからのフォーカス指示
+- Tauriのフォーカス喪失イベントを受けたときの選択・メニュー解除
+
+ブラウザー内にはテスト専用のTauri IPCモックを注入します。
+実ウィンドウを閉じたり移動したりせず、画面から正しいコマンドと引数が渡ることを確認します。
+Windows APIによる実際の前面表示や仮想デスクトップ切替の成功まで保証するテストではありません。
+ネイティブ処理を変更した場合は、Rust側のテストも実行してください。
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```

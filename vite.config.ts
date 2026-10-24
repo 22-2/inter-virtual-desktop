@@ -1,7 +1,6 @@
 import macros from "unplugin-parcel-macros";
 import optimizeLocales from "@react-aria/optimize-locales-plugin";
 import react from "@vitejs/plugin-react";
-// @ts-expect-error type error without @types/node package
 import process from "node:process";
 import { defineConfig } from "vite";
 
