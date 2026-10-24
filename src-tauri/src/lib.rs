@@ -88,7 +88,7 @@ mod platform {
         let app_name = process_name(hwnd);
         if matches!(
             app_name.as_str(),
-            "inter-virtual-desktop-adobe"
+            "inter-virtual-desktop"
                 | "MinimalShot"
                 | "SystemSettings"
                 | "ApplicationFrameHost"

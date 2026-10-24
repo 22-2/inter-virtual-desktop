@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    inter_virtual_desktop_adobe_lib::run()
+    inter_virtual_desktop_lib::run()
 }

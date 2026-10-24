@@ -1694,7 +1694,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "inter-virtual-desktop-adobe"
+name = "inter-virtual-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
