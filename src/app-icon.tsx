@@ -28,8 +28,8 @@ export function AppIcon({ hwnd, appName }: { hwnd: number; appName: string }) {
         <img
           src={icon}
           alt=""
-          width={20}
-          height={20}
+          width={16}
+          height={16}
           draggable={false}
           onError={() => setIcon(null)}
         />

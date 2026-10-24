@@ -476,13 +476,10 @@ input {
   color: #765115;
   background: #f9e1a8;
 }
-.app-icon.has-image {
-  background: transparent;
-}
 .app-icon img {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   object-fit: contain;
 }
 
