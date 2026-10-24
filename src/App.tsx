@@ -78,6 +78,50 @@ export function App() {
   const contextMenuSequence = useRef(0);
   const pendingContextTarget = useRef<ContextTarget | null>(null);
 
+  useEffect(() => {
+    const clearSelection = () => {
+      setWindowSelection((selection) =>
+        selection.ids.size || selection.anchorId !== null
+          ? { ids: new Set(), anchorId: null }
+          : selection,
+      );
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button === 2) {
+        pendingContextTarget.current = contextMenu
+          ? contextMenu.kind === "window"
+            ? { kind: "window", hwnd: contextMenu.hwnd }
+            : { kind: "desktop", index: contextMenu.index }
+          : null;
+        return;
+      }
+
+      pendingContextTarget.current = null;
+      const target = event.composedPath().find((node): node is Element => node instanceof Element);
+      if (
+        target?.closest(".quick-context-menu, .context-menu-content, [data-trigger='SubmenuTrigger']")
+      ) {
+        return;
+      }
+
+      setContextMenu(null);
+      if (!target?.closest("[data-window-hwnd], [data-window-sort]")) clearSelection();
+    };
+    const handleBlur = () => {
+      setContextMenu(null);
+      pendingContextTarget.current = null;
+      clearSelection();
+    };
+
+    // ポータルやライブラリが伝播を止める前に捕捉し、別アプリへのクリックも閉じる。
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [contextMenu]);
+
   const refresh = async () => {
     try {
       const next = await invoke<Snapshot>("get_snapshot");
@@ -270,20 +314,6 @@ export function App() {
       <div
         className="app-shell"
         data-theme={dark ? "dark" : "light"}
-        onPointerDownCapture={(event) => {
-          if (event.button === 2 && contextMenu) {
-            pendingContextTarget.current =
-              contextMenu.kind === "window"
-                ? { kind: "window", hwnd: contextMenu.hwnd }
-                : { kind: "desktop", index: contextMenu.index };
-          } else if (event.button !== 2) {
-            pendingContextTarget.current = null;
-            const target = event.target instanceof Element ? event.target : null;
-            if (event.button === 0 && contextMenu && !target?.closest(".quick-context-menu")) {
-              setContextMenu(null);
-            }
-          }
-        }}
         onContextMenuCapture={(event) => {
           const target = event.target instanceof Element ? event.target : null;
           const windowRow = target?.closest<HTMLElement>("[data-window-hwnd]");
@@ -691,6 +721,7 @@ export function App() {
           {contextMenu?.kind === "desktop" && (
             <Menu
               size="S"
+              UNSAFE_className="context-menu-content"
               aria-label={`${desktopName(contextMenu.index)} の操作`}
               onAction={handleContextMenuAction}
             >
@@ -702,14 +733,24 @@ export function App() {
             </Menu>
           )}
           {contextMenu?.kind === "window" && (
-            <Menu size="S" aria-label="ウィンドウの操作" onAction={handleContextMenuAction}>
+            <Menu
+              size="S"
+              UNSAFE_className="context-menu-content"
+              aria-label="ウィンドウの操作"
+              onAction={handleContextMenuAction}
+            >
               <SubmenuTrigger>
                 <MenuItem id="move" isDisabled={!contextMoveDestinations.length}>
                   {contextWindows.length > 1
                     ? `選択した${contextWindows.length}件の移動先`
                     : "移動先を選択"}
                 </MenuItem>
-                <Menu size="S" aria-label="移動先" onAction={handleContextMenuAction}>
+                <Menu
+                  size="S"
+                  UNSAFE_className="context-menu-content"
+                  aria-label="移動先"
+                  onAction={handleContextMenuAction}
+                >
                   {contextMoveDestinations.map((desktop) => (
                     <MenuItem key={desktop.index} id={`move:${desktop.index}`}>
                       {desktopName(desktop.index)}へ移動
