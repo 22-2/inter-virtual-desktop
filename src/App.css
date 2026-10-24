@@ -363,20 +363,88 @@ input {
   border-radius: 8px;
   background: var(--ui-surface);
 }
+.window-list:focus-visible {
+  outline: none;
+}
 
-.window-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) max-content 24px;
+.window-table {
+  width: 100%;
+  table-layout: fixed;
+  border-spacing: 0;
+}
+.window-app-column {
+  width: 64px;
+}
+.window-desktop-column {
+  width: 128px;
+}
+.window-state-column {
+  width: 104px;
+}
+.window-actions-column {
+  width: 36px;
+}
+.window-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 28px;
+  padding: 0 var(--space-sm);
+  border-bottom: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+  text-align: start;
+  font-weight: 500;
+}
+.window-sort-button {
+  display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  font-size: 0.6875rem;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.window-sort-button svg {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  --iconPrimary: currentColor;
+}
+.window-sort-button:hover,
+.window-table th[aria-sort="ascending"] .window-sort-button,
+.window-table th[aria-sort="descending"] .window-sort-button {
+  color: var(--ui-text);
+}
+.window-sort-button:focus-visible {
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.window-table td {
   height: var(--row-height);
-  min-width: 0;
   padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--ui-row-line);
+  vertical-align: middle;
+}
+.window-app-cell .app-icon {
+  margin-inline: auto;
+}
+.window-table .window-actions-cell {
+  padding-inline: var(--space-xs);
+}
+
+.window-row {
+  height: var(--row-height);
   cursor: grab;
 }
 
-.window-row:last-child {
+.window-row:last-child td {
   border-bottom: 0;
 }
 .window-row:hover,
@@ -411,6 +479,7 @@ input {
 
 .window-title {
   display: block;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   padding: 0;
@@ -454,16 +523,18 @@ input {
 .window-status {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   min-width: 0;
   color: var(--ui-muted);
   font-size: 0.6875rem;
   white-space: nowrap;
 }
 .window-desktop {
-  max-width: 160px;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .window-state {
   display: inline-flex;
@@ -522,6 +593,19 @@ input {
   }
   .window-desktop {
     max-width: 88px;
+  }
+  .window-app-column {
+    width: 56px;
+  }
+  .window-desktop-column {
+    width: 104px;
+  }
+  .window-state-column {
+    width: 96px;
+  }
+  .window-table th,
+  .window-table td {
+    padding-inline: var(--space-xs);
   }
 }
 

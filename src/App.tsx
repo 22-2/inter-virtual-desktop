@@ -24,6 +24,9 @@ import Apps from "@react-spectrum/s2/icons/Apps";
 import BrightnessContrast from "@react-spectrum/s2/icons/BrightnessContrast";
 import DeviceDesktop from "@react-spectrum/s2/icons/DeviceDesktop";
 import More from "@react-spectrum/s2/icons/More";
+import Sort from "@react-spectrum/s2/icons/Sort";
+import SortDown from "@react-spectrum/s2/icons/SortDown";
+import SortUp from "@react-spectrum/s2/icons/SortUp";
 import { style } from "@react-spectrum/s2/style" with { type: "macro" };
 import { invoke } from "@tauri-apps/api/core";
 import "@react-spectrum/s2/page.css";
@@ -40,6 +43,38 @@ type WindowInfo = {
   pinned: boolean;
 };
 type Snapshot = { desktops: Desktop[]; windows: WindowInfo[] };
+type WindowSortKey = "title" | "app_name" | "desktop_index" | "state";
+type WindowSort = { column: WindowSortKey; direction: "ascending" | "descending" };
+const windowCollator = new Intl.Collator("ja", { numeric: true, sensitivity: "base" });
+
+function WindowSortHeader({
+  column,
+  label,
+  sort,
+  onSort,
+}: {
+  column: WindowSortKey;
+  label: string;
+  sort: WindowSort;
+  onSort: (column: WindowSortKey) => void;
+}) {
+  const active = sort.column === column;
+  const nextDirection = active && sort.direction === "ascending" ? "降順" : "昇順";
+  const Icon = active ? (sort.direction === "ascending" ? SortUp : SortDown) : Sort;
+  return (
+    <th scope="col" aria-sort={active ? sort.direction : "none"} data-window-sort>
+      <button
+        type="button"
+        className="window-sort-button"
+        aria-label={`${label}で${nextDirection}に並べ替え`}
+        onClick={() => onSort(column)}
+      >
+        <span>{label}</span>
+        <Icon aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
 type ContextTarget = { kind: "window"; hwnd: number } | { kind: "desktop"; index: number };
 type ContextMenuState = ContextTarget & {
   x: number;
@@ -63,6 +98,10 @@ export function App() {
   const [appFilter, setAppFilter] = useState("all");
   const [desktopFilter, setDesktopFilter] = useState("selected");
   const [excludeMinimized, setExcludeMinimized] = useState(false);
+  const [windowSort, setWindowSort] = useState<WindowSort>({
+    column: "title",
+    direction: "ascending",
+  });
   const [selectedDesktop, setSelectedDesktop] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +138,9 @@ export function App() {
       pendingContextTarget.current = null;
       const target = event.composedPath().find((node): node is Element => node instanceof Element);
       if (
-        target?.closest(".quick-context-menu, .context-menu-content, [data-trigger='SubmenuTrigger']")
+        target?.closest(
+          ".quick-context-menu, .context-menu-content, [data-trigger='SubmenuTrigger']",
+        )
       ) {
         return;
       }
@@ -154,19 +195,41 @@ export function App() {
   const apps = [...new Set(snapshot.windows.map((window) => window.app_name))].sort();
   const visibleWindows = useMemo(
     () =>
-      snapshot.windows.filter((window) => {
-        const matchesText = `${window.title} ${window.app_name}`
-          .toLowerCase()
-          .includes(query.toLowerCase());
-        const matchesApp = appFilter === "all" || window.app_name === appFilter;
-        const matchesDesktop =
-          desktopFilter === "all" ||
-          (desktopFilter === "current" && window.desktop_index === current?.index) ||
-          (desktopFilter === "selected" && window.desktop_index === activeDesktop);
-        return (
-          matchesText && matchesApp && matchesDesktop && (!excludeMinimized || !window.minimized)
-        );
-      }),
+      snapshot.windows
+        .filter((window) => {
+          const matchesText = `${window.title} ${window.app_name}`
+            .toLowerCase()
+            .includes(query.toLowerCase());
+          const matchesApp = appFilter === "all" || window.app_name === appFilter;
+          const matchesDesktop =
+            desktopFilter === "all" ||
+            (desktopFilter === "current" && window.desktop_index === current?.index) ||
+            (desktopFilter === "selected" && window.desktop_index === activeDesktop);
+          return (
+            matchesText && matchesApp && matchesDesktop && (!excludeMinimized || !window.minimized)
+          );
+        })
+        .sort((left, right) => {
+          let comparison: number;
+          if (windowSort.column === "desktop_index") {
+            comparison = left.desktop_index - right.desktop_index;
+          } else if (windowSort.column === "state") {
+            comparison =
+              Number(left.minimized) * 2 +
+              Number(left.pinned) -
+              (Number(right.minimized) * 2 + Number(right.pinned));
+          } else {
+            const leftValue =
+              windowSort.column === "title" ? left.title || left.app_name : left.app_name;
+            const rightValue =
+              windowSort.column === "title" ? right.title || right.app_name : right.app_name;
+            comparison = windowCollator.compare(leftValue, rightValue);
+          }
+          // 更新時の列挙順に左右されないよう、同値はウィンドウIDで順序を固定する。
+          return comparison === 0
+            ? left.hwnd - right.hwnd
+            : comparison * (windowSort.direction === "ascending" ? 1 : -1);
+        }),
     [
       snapshot.windows,
       query,
@@ -175,10 +238,22 @@ export function App() {
       excludeMinimized,
       current?.index,
       activeDesktop,
+      windowSort,
     ],
   );
-  const visibleWindowIds = visibleWindows.map((window) => window.hwnd);
+  const visibleWindowIds = useMemo(
+    () => visibleWindows.map((window) => window.hwnd),
+    [visibleWindows],
+  );
   const selectedWindowCount = windowSelection.ids.size;
+
+  const toggleWindowSort = (column: WindowSortKey) => {
+    setWindowSort((sort) => ({
+      column,
+      direction:
+        sort.column === column && sort.direction === "ascending" ? "descending" : "ascending",
+    }));
+  };
 
   useEffect(() => {
     setWindowSelection((selection) => retainVisibleRows(selection, visibleWindowIds));
@@ -615,88 +690,148 @@ export function App() {
                     表示するウィンドウがありません。検索条件を変更してください。
                   </div>
                 )}
-                {!error &&
-                  visibleWindows.map((item) => {
-                    const isSelected = windowSelection.ids.has(item.hwnd);
-                    return (
-                      <div
-                        key={item.hwnd}
-                        className={`window-row ${isSelected ? "is-selected" : ""}`}
-                        data-window-hwnd={item.hwnd}
-                        draggable
-                        onClick={(event) => {
-                          if ((event.target as HTMLElement).closest("button")) return;
-                          setWindowSelection((selection) =>
-                            selectRow(selection, item.hwnd, visibleWindowIds, {
-                              toggle: event.ctrlKey || event.metaKey,
-                              range: event.shiftKey,
-                            }),
-                          );
-                        }}
-                        onDragStart={(event) =>
-                          event.dataTransfer.setData("text/window-hwnd", String(item.hwnd))
-                        }
-                      >
-                        <span
-                          className={`app-icon ${item.app_name.toLowerCase().includes("explorer") ? "explorer" : ""}`}
-                          aria-hidden="true"
-                        >
-                          {item.app_name.slice(0, 1).toUpperCase()}
-                        </span>
-                        <button
-                          type="button"
-                          className="window-title"
-                          aria-pressed={isSelected}
-                          title={`${item.title || item.app_name}\n${item.app_name}`}
-                          onClick={(event) =>
-                            setWindowSelection((selection) =>
-                              selectRow(selection, item.hwnd, visibleWindowIds, {
-                                toggle: event.ctrlKey || event.metaKey,
-                                range: event.shiftKey,
-                              }),
-                            )
-                          }
-                        >
-                          {item.title || item.app_name}
-                        </button>
-                        <span className="window-status">
-                          {desktopFilter === "all" && (
-                            <span
-                              className="window-desktop"
-                              title={desktopName(item.desktop_index)}
+                {!error && !loading && visibleWindows.length > 0 && (
+                  <table className="window-table" aria-label="ウィンドウ一覧">
+                    <colgroup>
+                      <col className="window-app-column" />
+                      <col />
+                      {desktopFilter === "all" && <col className="window-desktop-column" />}
+                      <col className="window-state-column" />
+                      <col className="window-actions-column" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <WindowSortHeader
+                          column="app_name"
+                          label="アプリ"
+                          sort={windowSort}
+                          onSort={toggleWindowSort}
+                        />
+                        <WindowSortHeader
+                          column="title"
+                          label="ウィンドウ"
+                          sort={windowSort}
+                          onSort={toggleWindowSort}
+                        />
+                        {desktopFilter === "all" && (
+                          <WindowSortHeader
+                            column="desktop_index"
+                            label="デスクトップ"
+                            sort={windowSort}
+                            onSort={toggleWindowSort}
+                          />
+                        )}
+                        <WindowSortHeader
+                          column="state"
+                          label="状態"
+                          sort={windowSort}
+                          onSort={toggleWindowSort}
+                        />
+                        <th scope="col" aria-label="操作" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleWindows.map((item) => {
+                        const isSelected = windowSelection.ids.has(item.hwnd);
+                        return (
+                          <tr
+                            key={item.hwnd}
+                            className={`window-row ${isSelected ? "is-selected" : ""}`}
+                            data-window-hwnd={item.hwnd}
+                            draggable
+                            onClick={(event) => {
+                              if ((event.target as HTMLElement).closest("button")) return;
+                              setWindowSelection((selection) =>
+                                selectRow(selection, item.hwnd, visibleWindowIds, {
+                                  toggle: event.ctrlKey || event.metaKey,
+                                  range: event.shiftKey,
+                                }),
+                              );
+                            }}
+                            onDragStart={(event) =>
+                              event.dataTransfer.setData("text/window-hwnd", String(item.hwnd))
+                            }
+                          >
+                            <td
+                              className="window-app-cell"
+                              aria-label={item.app_name}
+                              title={item.app_name}
                             >
-                              {desktopName(item.desktop_index)}
-                            </span>
-                          )}
-                          {item.pinned && (
-                            <span className="window-state" title="すべてのデスクトップに表示">
-                              固定
-                            </span>
-                          )}
-                          {item.minimized && <span className="window-state">最小化</span>}
-                        </span>
-                        <ActionButton
-                          size="XS"
-                          isQuiet
-                          aria-label={`${item.title || item.app_name} の操作`}
-                          onPress={(event) => {
-                            const trigger = event.target.closest<HTMLElement>("button");
-                            if (!trigger) return;
-                            const rect = trigger.getBoundingClientRect();
-                            showContextMenu(
-                              { kind: "window", hwnd: item.hwnd },
-                              rect.right,
-                              rect.bottom,
-                              "bottom end",
-                              trigger,
-                            );
-                          }}
-                        >
-                          <More />
-                        </ActionButton>
-                      </div>
-                    );
-                  })}
+                              <span
+                                className={`app-icon ${item.app_name.toLowerCase().includes("explorer") ? "explorer" : ""}`}
+                                aria-hidden="true"
+                              >
+                                {item.app_name.slice(0, 1).toUpperCase()}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="window-title"
+                                aria-pressed={isSelected}
+                                title={`${item.title || item.app_name}\n${item.app_name}`}
+                                onClick={(event) =>
+                                  setWindowSelection((selection) =>
+                                    selectRow(selection, item.hwnd, visibleWindowIds, {
+                                      toggle: event.ctrlKey || event.metaKey,
+                                      range: event.shiftKey,
+                                    }),
+                                  )
+                                }
+                              >
+                                {item.title || item.app_name}
+                              </button>
+                            </td>
+                            {desktopFilter === "all" && (
+                              <td>
+                                <span
+                                  className="window-desktop"
+                                  title={desktopName(item.desktop_index)}
+                                >
+                                  {desktopName(item.desktop_index)}
+                                </span>
+                              </td>
+                            )}
+                            <td>
+                              <span className="window-status">
+                                {item.pinned && (
+                                  <span className="window-state" title="すべてのデスクトップに表示">
+                                    固定
+                                  </span>
+                                )}
+                                {item.minimized && <span className="window-state">最小化</span>}
+                              </span>
+                            </td>
+                            <td className="window-actions-cell">
+                              <ActionButton
+                                size="XS"
+                                isQuiet
+                                aria-label={`${item.title || item.app_name} の操作`}
+                                onPress={(event) => {
+                                  const trigger = event.target.closest<HTMLElement>("button");
+                                  if (!trigger) return;
+                                  setWindowSelection((selection) =>
+                                    selectRowForContextMenu(selection, item.hwnd),
+                                  );
+                                  const rect = trigger.getBoundingClientRect();
+                                  showContextMenu(
+                                    { kind: "window", hwnd: item.hwnd },
+                                    rect.right,
+                                    rect.bottom,
+                                    "bottom end",
+                                    trigger,
+                                  );
+                                }}
+                              >
+                                <More />
+                              </ActionButton>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </section>
           </main>
