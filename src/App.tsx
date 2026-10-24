@@ -22,6 +22,7 @@ import {
 import Add from "@react-spectrum/s2/icons/Add";
 import Apps from "@react-spectrum/s2/icons/Apps";
 import BrightnessContrast from "@react-spectrum/s2/icons/BrightnessContrast";
+import DeviceDesktop from "@react-spectrum/s2/icons/DeviceDesktop";
 import More from "@react-spectrum/s2/icons/More";
 import { style } from "@react-spectrum/s2/style" with { type: "macro" };
 import { invoke } from "@tauri-apps/api/core";
@@ -380,10 +381,9 @@ export function App() {
                       onClick={() => setSelectedDesktop(desktop.index)}
                       onDoubleClick={() => void run("switch_desktop", { index: desktop.index })}
                     >
-                      <span
-                        className={`desktop-dot ${desktop.current ? "current" : ""}`}
-                        aria-hidden="true"
-                      />
+                      <span className={`desktop-icon ${desktop.current ? "current" : ""}`}>
+                        <DeviceDesktop aria-hidden="true" />
+                      </span>
                       <span className="desktop-name">{name}</span>
                       <span className="desktop-count" aria-label={`${count} ウィンドウ`}>
                         {count}

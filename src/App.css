@@ -186,17 +186,22 @@ input {
   cursor: pointer;
 }
 
-.desktop-dot {
-  display: block;
-  width: 14px;
-  height: 11px;
-  border: 1.5px solid var(--ui-muted);
-  border-radius: 2px;
+.desktop-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ui-muted);
 }
 
-.desktop-dot.current {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
+.desktop-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.desktop-icon.current {
+  color: var(--ui-accent);
 }
 .desktop-name {
   display: block;
@@ -206,10 +211,21 @@ input {
   white-space: nowrap;
 }
 .desktop-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ui-hover);
   color: var(--ui-muted);
   font-size: 0.6875rem;
-  text-align: end;
   font-variant-numeric: tabular-nums;
+}
+.desktop-entry.is-selected .desktop-count {
+  background: var(--ui-surface);
+  color: var(--ui-accent);
 }
 
 .sidebar-footer {
@@ -284,6 +300,10 @@ input {
 .filter-desktop {
   display: grid;
   min-width: 0;
+}
+.filter-search [slot="icon"] > svg {
+  width: 14px;
+  height: 14px;
 }
 
 .filter-options {
@@ -439,7 +459,17 @@ input {
   text-overflow: ellipsis;
 }
 .window-state {
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  background: var(--ui-hover);
+  color: var(--ui-muted);
+  font-size: 0.625rem;
+  font-weight: 500;
 }
 
 .desktop-select:focus-visible {
